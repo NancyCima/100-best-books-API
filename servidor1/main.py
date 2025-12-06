@@ -1,30 +1,49 @@
 """
 SERVIDOR 1 - Gateway/Proxy
-API intermedia con autenticación y rate limiting
-Reenvía peticiones a Servidor 2 (datos)
+Versión con rate limiting manual (sin slowapi)
 """
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from typing import List
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 import secrets
 import requests
+import time
+from collections import defaultdict
 
 # Configuración del Servidor 2 (datos)
-SERVIDOR2_URL = "http://localhost:9000"  # Puerto diferente
+SERVIDOR2_URL = "http://localhost:9000"
 
-# Rate limiting
-limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Autenticación Basic
 security = HTTPBasic()
 USERNAME = "admin"
 PASSWORD = "redes2025"
+
+# Rate limiting manual - simple pero efectivo
+request_counts = defaultdict(list)
+RATE_LIMIT = 2  # requests
+RATE_WINDOW = 5  # segundo
+
+def check_rate_limit(client_ip: str):
+    """Verifica si el cliente ha excedido el límite de requests"""
+    now = time.time()
+    
+    # Limpiar requests antiguos (fuera de la ventana de tiempo)
+    request_counts[client_ip] = [
+        timestamp for timestamp in request_counts[client_ip]
+        if now - timestamp < RATE_WINDOW
+    ]
+    
+    # Verificar si excede el límite
+    if len(request_counts[client_ip]) >= RATE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded: {RATE_LIMIT} per {RATE_WINDOW} second"
+        )
+    
+    # Registrar este request
+    request_counts[client_ip].append(now)
 
 def verificar_credenciales(credentials: HTTPBasicCredentials = Depends(security)):
     """Verifica credenciales para POST y DELETE"""
@@ -39,14 +58,13 @@ def verificar_credenciales(credentials: HTTPBasicCredentials = Depends(security)
         )
     return credentials.username
 
-# ENDPOINTS - Actúan como proxy hacia Servidor 2
-
 @app.get("/")
-@limiter.limit("10/second")
 def bienvenida(request: Request):
     """Endpoint raíz con información del sistema"""
+    client_ip = request.client.host
+    check_rate_limit(client_ip)  # RATE LIMITING
+    
     try:
-        # Consultar estado de Servidor 2
         response = requests.get(f"{SERVIDOR2_URL}/", timeout=5)
         servidor2_info = response.json()
         
@@ -64,7 +82,6 @@ def bienvenida(request: Request):
         )
 
 @app.get("/libros/")
-@limiter.limit("20/second")
 def get_filtrar_libros(
     request: Request,
     autor: str = None,
@@ -74,6 +91,9 @@ def get_filtrar_libros(
     anioMax: int = None
 ) -> List[dict]:
     """Filtra libros (proxy a Servidor 2)"""
+    client_ip = request.client.host
+    check_rate_limit(client_ip)  # RATE LIMITING
+    
     try:
         params = {}
         if autor: params['autor'] = autor
@@ -98,9 +118,11 @@ def get_filtrar_libros(
         )
 
 @app.get("/libros/{titulo}")
-@limiter.limit("20/second")
 def get_libro(request: Request, titulo: str) -> dict:
     """Obtiene un libro (proxy a Servidor 2)"""
+    client_ip = request.client.host
+    check_rate_limit(client_ip)  # RATE LIMITING
+    
     try:
         response = requests.get(f"{SERVIDOR2_URL}/libros/{titulo}", timeout=5)
         
@@ -118,7 +140,6 @@ def get_libro(request: Request, titulo: str) -> dict:
         )
 
 @app.post("/libros/{titulo}")
-@limiter.limit("5/second")
 def agregar_libro(
     request: Request,
     titulo: str,
@@ -132,6 +153,9 @@ def agregar_libro(
     username: str = Depends(verificar_credenciales)  # AUTENTICACIÓN
 ):
     """Agrega libro (proxy a Servidor 2) - REQUIERE AUTENTICACIÓN"""
+    client_ip = request.client.host
+    check_rate_limit(client_ip)  # RATE LIMITING
+    
     try:
         params = {
             'titulo': titulo,
@@ -162,7 +186,6 @@ def agregar_libro(
         )
 
 @app.put("/libros/{titulo}")
-@limiter.limit("10/second")
 def actualizar_libro(
     request: Request,
     titulo: str,
@@ -176,6 +199,9 @@ def actualizar_libro(
     link: str = None
 ):
     """Actualiza libro (proxy a Servidor 2)"""
+    client_ip = request.client.host
+    check_rate_limit(client_ip)  # RATE LIMITING
+    
     try:
         params = {
             'tituloAct': tituloAct,
@@ -208,13 +234,15 @@ def actualizar_libro(
         )
 
 @app.delete("/libros/{titulo}")
-@limiter.limit("5/second")
 def eliminar_libro(
     request: Request,
     titulo: str,
     username: str = Depends(verificar_credenciales)  # AUTENTICACIÓN
 ):
     """Elimina libro (proxy a Servidor 2) - REQUIERE AUTENTICACIÓN"""
+    client_ip = request.client.host
+    check_rate_limit(client_ip)  # RATE LIMITING
+    
     try:
         response = requests.delete(f"{SERVIDOR2_URL}/libros/{titulo}", timeout=5)
         

@@ -1,6 +1,6 @@
 """
 Cliente API con soporte para autenticación Basic
-Corregido el import de requests
+Versión corregida con mejor manejo de errores en input
 """
 import requests
 from requests.auth import HTTPBasicAuth
@@ -33,15 +33,8 @@ def mostrar_todos(libros):
         print("------------------------------\n")
         i += 1
 
-def valida(opc):
-    """Valida que la opción esté en el rango correcto"""
-    while opc < 1 or opc > 6:
-        print("Opción inválida")
-        opc = int(input("Ingrese una opción válida >"))
-    return opc
-
 def menu() -> int:
-    """Muestra el menú de opciones"""
+    """Muestra el menú de opciones con validación mejorada"""
     print("Opciones:\n")
     print("\t1. Buscar libro")
     print("\t2. Filtrar libros")
@@ -49,9 +42,20 @@ def menu() -> int:
     print("\t4. Actualizar libro")
     print("\t5. Eliminar libro (requiere autenticación)")
     print("\t6. Salir")
-    opc = int(input("\nIngrese una opción >"))
-    opc = valida(opc)
-    return opc
+    
+    while True:
+        try:
+            opc_str = input("\nIngrese una opción (1-6) > ").strip()
+            if not opc_str:
+                print("Error: Debe ingresar un número")
+                continue
+            opc = int(opc_str)
+            if 1 <= opc <= 6:
+                return opc
+            else:
+                print("Error: Opción inválida. Ingrese un número entre 1 y 6")
+        except ValueError:
+            print("Error: Debe ingresar un número válido entre 1 y 6")
 
 def armar_url_filtro(url):
     """Construye la URL para filtrar libros"""
@@ -236,6 +240,8 @@ def main():
 
         print()
         opc = menu()
+
+    print("\n¡Hasta luego!")
 
 if __name__ == "__main__":
     main()
