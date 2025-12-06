@@ -52,8 +52,7 @@ python main.py
 - Contraseña: `redes2025`
 
 **Rate Limiting**:
-- GET: 10-20 solicitudes/segundo
-- POST/DELETE: 5 solicitudes/segundo
+- 2 requests cada 5 segundos
 
 ---
 
