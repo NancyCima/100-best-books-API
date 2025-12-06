@@ -1,260 +1,241 @@
-from requests import *
+"""
+Cliente API con soporte para autenticación Basic
+Corregido el import de requests
+"""
+import requests
+from requests.auth import HTTPBasicAuth
 
 # Configuración del servidor
-URL = "http://localhost:8000"  # URL local para desarrollo
+URL = "http://localhost:8000"  # Cambiar por IP del servidor remoto
 
-#Funcion para mostrar un libro
+# Credenciales para métodos POST y DELETE
+USERNAME = "admin"
+PASSWORD = "redes2025"
+
 def mostrar_libro(libro):
+    """Muestra la información de un libro"""
+    print("Titulo: ", libro["title"])
+    print("Autor: ", libro["author"])
+    print("Idioma: ", libro["language"])
+    print("Páginas: ", libro["pages"])
+    print("País: ", libro["country"])
+    print("Año: ", libro["year"])
+    print("Imagen: ", libro["imageLink"])
+    print("Link: ", libro["link"])
 
-  print("Titulo: ", libro["title"])
-  print("Autor: ", libro["author"])
-  print("Idioma: ", libro["language"])
-  print("Paginas: ", libro["pages"])
-  print("Pais: ", libro["country"])
-  print("Año: ", libro["year"])
-  print("Imagen: ", libro["imageLink"])
-  print("Link: ", libro["link"])
-
-#Funcion para mostrar todos los libros
 def mostrar_todos(libros):
-  i = 1
-  print("\t-----Listado de libros:-----")
-  for libro in libros:
-    print("Indice: ", i)
-    mostrar_libro(libro)
-    print("------------------------------\n")
-    i += 1
+    """Muestra todos los libros de una lista"""
+    i = 1
+    print("\t-----Listado de libros:-----")
+    for libro in libros:
+        print("Índice: ", i)
+        mostrar_libro(libro)
+        print("------------------------------\n")
+        i += 1
 
-#Funcion para validar opcion
 def valida(opc):
-  while opc < 1 or opc > 6:
-    print("Opción inválida")
-    opc = int(input("Ingrese una opción válida >"))
-  return opc
+    """Valida que la opción esté en el rango correcto"""
+    while opc < 1 or opc > 6:
+        print("Opción inválida")
+        opc = int(input("Ingrese una opción válida >"))
+    return opc
 
-#Menu de opciones 
 def menu() -> int:
-  print("Opciones:\n")
-  print("\t1. Buscar libro")
-  print("\t2. Filtrar libros")
-  print("\t3. Agregar libro")
-  print("\t4. Actualizar libro")
-  print("\t5. Eliminar libro")
-  print("\t6. Salir")
-  opc = int(input("\nIngrese una opcion >"))
-  opc = valida(opc)
-  return opc
+    """Muestra el menú de opciones"""
+    print("Opciones:\n")
+    print("\t1. Buscar libro")
+    print("\t2. Filtrar libros")
+    print("\t3. Agregar libro (requiere autenticación)")
+    print("\t4. Actualizar libro")
+    print("\t5. Eliminar libro (requiere autenticación)")
+    print("\t6. Salir")
+    opc = int(input("\nIngrese una opción >"))
+    opc = valida(opc)
+    return opc
 
-#Funcion para armar la url de un filtrado de libros
 def armar_url_filtro(url):
+    """Construye la URL para filtrar libros"""
+    print("\nAclaración: si no desea ingresar un filtro, deje en blanco el mismo\n")
+    autor = input("Ingrese el autor >")
+    idioma = input("Ingrese el idioma >")
+    pais = input("Ingrese el país >")
+    anioMin = input("Ingrese el año mínimo >")
+    anioMax = input("Ingrese el año máximo >")
 
-  print(
-      "\nAclaracion: si no desea ingresar un filtro, deje en blanco el mismo\n"
-  )
-  autor = input("Ingrese el autor >")
-  idioma = input("Ingrese el idioma >")
-  pais = input("Ingrese el pais >")
-  anioMin = input("Ingrese el año minimo >")
-  anioMax = input("Ingrese el año maximo >")
+    params = {}
+    if autor:
+        params['autor'] = autor
+    if idioma:
+        params['idioma'] = idioma
+    if pais:
+        params['pais'] = pais
+    if anioMin:
+        params['anioMin'] = anioMin
+    if anioMax:
+        params['anioMax'] = anioMax
 
-  if autor != "" or idioma != "" or pais != "" or anioMin != "" or anioMax != "":
-    url += "?"
+    return url, params
 
-  if autor != "":
-    autor = autor.replace(" ", "%20")
-    url += "autor=" + autor
-
-  if idioma != "":
-    idioma = idioma.replace(" ", "%20")
-    url += "&idioma=" + idioma
-
-  if pais != "":
-    pais = pais.replace(" ", "%20")
-    url += "&pais=" + pais
-
-  if anioMin != "":
-    url += "&anioMin=" + anioMin
-
-  if anioMax != "":
-    url += "&anioMax=" + anioMax
-
-  return url
-
-#Funcion para armar url de un agregado de libro
 def armar_url_agregar(url):
+    """Construye la URL y parámetros para agregar un libro"""
+    print("\nAclaración: los campos no requeridos se pueden dejar en blanco\n")
+    titulo = input("Ingrese el título (*requerido) >")
+    autor = input("Ingrese el autor (*requerido) >")
+    idioma = input("Ingrese el idioma (*requerido) >")
+    paginas = input("Ingrese el número de páginas (*requerido) >")
+    pais = input("Ingrese el país (*requerido) >")
+    anio = input("Ingrese el año (*requerido) >")
+    imagen = input("Ingrese el link de la imagen >")
+    link = input("Ingrese el link del libro >")
 
-  print("\nAclaracion: los campos no requeridos se pueden dejar en blanco\n")
-  titulo = input("Ingrese el titulo (*requerido) >")
-  autor = input("Ingrese el autor (*requerido) >")
-  idioma = input("Ingrese el idioma (*requerido) >")
-  paginas = input("Ingrese el numero de paginas (*requerido) >")
-  pais = input("Ingrese el pais (*requerido) >")
-  anio = input("Ingrese el año (*requerido) >")
-  imagen = input("Ingrese el link de la imagen >")
-  link = input("Ingrese el link del libro >")
+    url = f"{url}{titulo}"
+    
+    params = {
+        'autor': autor,
+        'idioma': idioma,
+        'paginas': paginas,
+        'pais': pais,
+        'anio': anio
+    }
+    
+    if imagen:
+        params['imagen'] = imagen
+    if link:
+        params['link'] = link
 
-  titulo = titulo.replace(" ", "%20")
-  url += titulo
+    return url, params
 
-  url += "?"
-
-  autor = autor.replace(" ", "%20")
-  url += "&autor=" + autor
-
-  idioma = idioma.replace(" ", "%20")
-  url += "&idioma=" + idioma
-
-  url += "&paginas=" + paginas
-
-  pais = pais.replace(" ", "%20")
-  url += "&pais=" + pais
-
-  url += "&anio=" + anio
-
-  if imagen != "":
-    url += "&imagen=" + imagen
-
-  if link != "":
-    url += "&link=" + link
-
-  return url
-
-#Funcion para armar url de una actualización de libro
 def armar_url_actualizar(url):
+    """Construye la URL y parámetros para actualizar un libro"""
+    print("Aclaración: los campos no requeridos se pueden dejar en blanco")
 
-  print("Aclaracion: los campos no requeridos se pueden dejar en blanco")
+    titulo = input("Ingrese el título del libro a actualizar (*requerido) >")
+    tituloAct = input("Ingrese el nuevo título del libro (*requerido) >")
+    autor = input("Ingrese el autor (*requerido) >")
+    idioma = input("Ingrese el idioma (*requerido) >")
+    paginas = input("Ingrese el número de páginas (*requerido) >")
+    pais = input("Ingrese el país (*requerido) >")
+    anio = input("Ingrese el año (*requerido) >")
+    imagen = input("Ingrese el link de la imagen >")
+    link = input("Ingrese el link del libro >")
 
-  titulo = input("Ingrese el título del libro a actualizar (*requerido) >")
-  tituloAct = input("Ingrese el nuevo título del libro (*requerido) >")
-  autor = input("Ingrese el autor (*requerido) >")
-  idioma = input("Ingrese el idioma (*requerido) >")
-  paginas = input("Ingrese el numero de paginas (*requerido) >")
-  pais = input("Ingrese el pais (*requerido) >")
-  anio = input("Ingrese el año (*requerido) >")
-  imagen = input("Ingrese el link de la imagen >")
-  link = input("Ingrese el link del libro >")
+    url = f"{url}{titulo}"
+    
+    params = {
+        'tituloAct': tituloAct,
+        'autor': autor,
+        'idioma': idioma,
+        'paginas': paginas,
+        'pais': pais,
+        'anio': anio
+    }
+    
+    if imagen:
+        params['imagen'] = imagen
+    if link:
+        params['link'] = link
 
-  titulo = titulo.replace(" ", "%20")
-  url += titulo
-
-  url += "?"
-
-  tituloAct = tituloAct.replace(" ", "%20")
-  url += "tituloAct=" + tituloAct
-
-  autor = autor.replace(" ", "%20")
-  url += "&autor=" + autor
-
-  idioma = idioma.replace(" ", "%20")
-  url += "&idioma=" + idioma
-
-  url += "&paginas=" + paginas
-
-  pais = pais.replace(" ", "%20")
-  url += "&pais=" + pais
-
-  url += "&anio=" + anio
-
-  if imagen != "":
-    url += "&imagen=" + imagen
-
-  if link != "":
-    url += "&link=" + link
-
-  return url
-
+    return url, params
 
 def main():
-
-  # Mensaje de bienvenida con manejo de errores
-  try:
-    response = get(URL)
-    print(f"Status code: {response.status_code}")
-    print(f"Response headers: {response.headers}")
-    print(f"Response content: {response.text}")
-    
-    response.raise_for_status()  # Lanza una excepción para códigos de error HTTP
-    bienvenida = response.json()
-    
-    print("\n--- Respuesta del servidor ---")
-    for key, value in bienvenida.items():
-      print(f"{key}: {value}")
-    print("----------------------------\n")
-  except Exception as e:
-    print(f"Error al conectar con el servidor: {e}")
-    print(f"Asegúrate de que el servidor esté ejecutándose en {URL}")
-    return
-
-  opc = menu()
-
-  while opc != 6:
-
-    url = URL + "/libros/"
-
-    if opc == 1:  #Buscar libro
-      titulo = input("Ingrese el título del libro >")
-      if " " in titulo:
-        titulo = titulo.replace(" ", "%20")
-      url += titulo
-      rta = get(url)
-      print()
-      libro = rta.json()
-      if rta.status_code == 200:
-        mostrar_libro(libro)
-      else: 
-        for i in libro:
-          print(">>>",libro[i])
+    """Función principal del cliente"""
+    # Mensaje de bienvenida con manejo de errores
+    try:
+        response = requests.get(URL)
+        print(f"Status code: {response.status_code}")
         
+        response.raise_for_status()
+        bienvenida = response.json()
+        
+        print("\n--- Respuesta del servidor ---")
+        for key, value in bienvenida.items():
+            print(f"{key}: {value}")
+        print("----------------------------\n")
+    except requests.exceptions.ConnectionError:
+        print(f"Error: No se puede conectar con el servidor en {URL}")
+        print("Asegúrate de que el servidor esté ejecutándose")
+        return
+    except Exception as e:
+        print(f"Error al conectar con el servidor: {e}")
+        return
 
-    if opc == 2:  #Filtrar libros
-
-      url = armar_url_filtro(url)
-
-      rta = get(url)
-      libros = get(url).json()
-      
-      print()
-      if rta.status_code == 200:
-        mostrar_todos(libros)
-      else:
-        for i in libros:
-          print(">>>",libros[i])
-
-    if opc == 3:  #Agregar libro
-      
-      url = armar_url_agregar(url)
-
-      msj = post(url).json()
-      
-      print()
-      for i in msj:
-        print(msj[i])
-
-    if opc == 4:  #Actualizar libro
-
-      url = armar_url_actualizar(url)
-
-      msj = put(url).json()
-
-      print()
-      for i in msj:
-        print(msj[i])
-
-    if opc == 5:  #Eliminar libro
-      titulo = input("Ingrese el título del libro a eliminar >")
-      titulo = titulo.replace(" ", "%20")
-
-      url += titulo
-
-      msj = delete(url).json()
-
-      print()
-      for i in msj:
-        print(msj[i])
-
-    print()
     opc = menu()
 
+    while opc != 6:
+        url = f"{URL}/libros/"
+
+        try:
+            if opc == 1:  # Buscar libro
+                titulo = input("Ingrese el título del libro >")
+                url = f"{url}{titulo}"
+                rta = requests.get(url)
+                print()
+                
+                if rta.status_code == 200:
+                    libro = rta.json()
+                    mostrar_libro(libro)
+                else:
+                    error = rta.json()
+                    print(f"Error: {error.get('detail', 'Error desconocido')}")
+
+            elif opc == 2:  # Filtrar libros
+                url, params = armar_url_filtro(url)
+                rta = requests.get(url, params=params)
+                print()
+                
+                if rta.status_code == 200:
+                    libros = rta.json()
+                    mostrar_todos(libros)
+                else:
+                    error = rta.json()
+                    print(f"Error: {error.get('detail', 'Error desconocido')}")
+
+            elif opc == 3:  # Agregar libro (CON AUTENTICACIÓN)
+                url, params = armar_url_agregar(url)
+                auth = HTTPBasicAuth(USERNAME, PASSWORD)
+                rta = requests.post(url, params=params, auth=auth)
+                print()
+                
+                if rta.status_code == 200:
+                    msj = rta.json()
+                    print(f"✓ {msj['message']}")
+                else:
+                    error = rta.json()
+                    print(f"Error: {error.get('detail', 'Error desconocido')}")
+
+            elif opc == 4:  # Actualizar libro
+                url, params = armar_url_actualizar(url)
+                rta = requests.put(url, params=params)
+                print()
+                
+                if rta.status_code == 200:
+                    msj = rta.json()
+                    print(f"✓ {msj['message']}")
+                else:
+                    error = rta.json()
+                    print(f"Error: {error.get('detail', 'Error desconocido')}")
+
+            elif opc == 5:  # Eliminar libro (CON AUTENTICACIÓN)
+                titulo = input("Ingrese el título del libro a eliminar >")
+                url = f"{url}{titulo}"
+                auth = HTTPBasicAuth(USERNAME, PASSWORD)
+                rta = requests.delete(url, auth=auth)
+                print()
+                
+                if rta.status_code == 200:
+                    msj = rta.json()
+                    print(f"✓ {msj['message']}")
+                else:
+                    error = rta.json()
+                    print(f"Error: {error.get('detail', 'Error desconocido')}")
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error en la solicitud: {e}")
+        except Exception as e:
+            print(f"Error: {e}")
+
+        print()
+        opc = menu()
 
 if __name__ == "__main__":
-  main()
+    main()
