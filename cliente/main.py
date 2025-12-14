@@ -1,27 +1,28 @@
 """
 Cliente API con soporte para autenticación Basic
-Versión corregida con mejor manejo de errores en input
 """
 import requests
 from requests.auth import HTTPBasicAuth
+from getpass import getpass
+
 
 # Configuración del servidor
-URL = "http://localhost:8000"  # Cambiar por IP del servidor remoto
+URL = "http://localhost:8000"
 
-# Credenciales para métodos POST y DELETE
-USERNAME = "admin"
-PASSWORD = "redes2025"
+# Variables globales para credenciales
+USERNAME = None
+PASSWORD = None
 
 def mostrar_libro(libro):
     """Muestra la información de un libro"""
-    print("Titulo: ", libro["title"])
+    print("Título: ", libro["title"])
     print("Autor: ", libro["author"])
     print("Idioma: ", libro["language"])
     print("Páginas: ", libro["pages"])
     print("País: ", libro["country"])
     print("Año: ", libro["year"])
-    print("Imagen: ", libro["imageLink"])
-    print("Link: ", libro["link"])
+    print("Imagen: ", libro["imageLink"] if libro["imageLink"] else "No disponible")
+    print("Link: ", libro["link"] if libro["link"] else "No disponible")
 
 def mostrar_todos(libros):
     """Muestra todos los libros de una lista"""
@@ -35,213 +36,437 @@ def mostrar_todos(libros):
 
 def menu() -> int:
     """Muestra el menú de opciones con validación mejorada"""
-    print("Opciones:\n")
-    print("\t1. Buscar libro")
-    print("\t2. Filtrar libros")
-    print("\t3. Agregar libro (requiere autenticación)")
-    print("\t4. Actualizar libro")
-    print("\t5. Eliminar libro (requiere autenticación)")
+    print("\n" + "="*50)
+    print("BIBLIOTECA ONLINE - MENÚ PRINCIPAL")
+    print("="*50)
+    print("\nOpciones:")
+    print("\t1. Buscar libro por título")
+    print("\t2. Filtrar libros (autor, idioma, país, año)")
+    print("\t3. Agregar nuevo libro")
+    print("\t4. Actualizar libro existente")
+    print("\t5. Eliminar libro")
     print("\t6. Salir")
     
     while True:
         try:
             opc_str = input("\nIngrese una opción (1-6) > ").strip()
             if not opc_str:
-                print("Error: Debe ingresar un número")
+                print("❌ Error: Debe ingresar un número")
                 continue
             opc = int(opc_str)
             if 1 <= opc <= 6:
                 return opc
             else:
-                print("Error: Opción inválida. Ingrese un número entre 1 y 6")
+                print("❌ Error: Opción inválida. Ingrese un número entre 1 y 6")
         except ValueError:
-            print("Error: Debe ingresar un número válido entre 1 y 6")
+            print("❌ Error: Debe ingresar un número válido entre 1 y 6")
 
-def armar_url_filtro(url):
-    """Construye la URL para filtrar libros"""
-    print("\nAclaración: si no desea ingresar un filtro, deje en blanco el mismo\n")
-    autor = input("Ingrese el autor >")
-    idioma = input("Ingrese el idioma >")
-    pais = input("Ingrese el país >")
-    anioMin = input("Ingrese el año mínimo >")
-    anioMax = input("Ingrese el año máximo >")
+def solicitar_credenciales(max_intentos: int = 3) -> tuple:
+    """
+    Solicita credenciales al usuario y valida contra .env
+    
+    Args:
+        max_intentos: Número máximo de intentos permitidos
+        
+    Returns:
+        tuple: (username, password) si son válidas
+        
+    Raises:
+        ValueError: Si se exceden los intentos o credenciales inválidas
+    """
+    # Obtener credenciales correctas del .env
+    username_correcto = "admin"
+    password_correcto = "redes2025"
+    
+    # Validar que existan en el .env
+    if not username_correcto or not password_correcto:
+        raise ValueError(
+            "ERROR: Credenciales no configuradas en .env\n"
+            "   Asegúrate de tener USERNAME y PASSWORD definidos"
+        )
+    
+    for intento in range(1, max_intentos + 1):
+        print(f"\nIntento {intento} de {max_intentos}")
+        print("-"*50)
+        
+        username = input("Usuario: ").strip()
+        # Usar getpass para ocultar la contraseña al escribir
+        password = getpass("Contraseña: ").strip()
+        
+        # Validar credenciales
+        if username == username_correcto and password == password_correcto:
+            print("✅ Autenticación exitosa\n")
+            return username, password
+        else:
+            if intento < max_intentos:
+                print("❌ Credenciales incorrectas. Intenta nuevamente.")
+            else:
+                print("❌ Credenciales incorrectas.")
+    
+    # Si llegamos aquí, se excedieron los intentos
+    raise ValueError(
+        f"❌ ERROR: Máximo de intentos ({max_intentos}) excedido.\n"
+        "   Acceso denegado."
+    )
 
-    params = {}
+def obtener_entero(mensaje: str, obligatorio: bool = True, minimo: int = None, maximo: int = None):
+    """
+    Solicita un número entero al usuario con validación
+    
+    Args:
+        mensaje: Texto a mostrar
+        obligatorio: Si es True, no acepta entrada vacía
+        minimo: Valor mínimo permitido (opcional)
+        maximo: Valor máximo permitido (opcional)
+    
+    Returns:
+        int o None: Número ingresado, o None si no es obligatorio y se dejó vacío
+    """
+    while True:
+        valor_str = input(mensaje).strip()
+        
+        # Si no es obligatorio y está vacío, retorna None
+        if not valor_str and not obligatorio:
+            return None
+        
+        # Si es obligatorio y está vacío, muestra error
+        if not valor_str and obligatorio:
+            print("❌ Error: Este campo es obligatorio")
+            continue
+        
+        # Intentar convertir a entero
+        try:
+            valor = int(valor_str)
+        except ValueError:
+            print("❌ Error: Debe ingresar un número entero válido")
+            continue
+        
+        # Validar rango mínimo
+        if minimo is not None and valor < minimo:
+            print(f"❌ Error: El valor debe ser mayor o igual a {minimo}")
+            continue
+        
+        # Validar rango máximo
+        if maximo is not None and valor > maximo:
+            print(f"❌ Error: El valor debe ser menor o igual a {maximo}")
+            continue
+        
+        return valor
+
+def obtener_filtros() -> dict:
+    """Solicita filtros de búsqueda al usuario"""
+    print("\n" + "-"*40)
+    print("FILTROS DE BÚSQUEDA")
+    print("(Deje vacío cualquier filtro que no desee aplicar)")
+    print("-"*40)
+    
+    filtros = {}
+    
+    # Campos de texto
+    autor = input("Autor: ").strip()
     if autor:
-        params['autor'] = autor
+        filtros['autor'] = autor
+    
+    idioma = input("Idioma: ").strip()
     if idioma:
-        params['idioma'] = idioma
+        filtros['idioma'] = idioma
+    
+    pais = input("País: ").strip()
     if pais:
-        params['pais'] = pais
-    if anioMin:
-        params['anioMin'] = anioMin
-    if anioMax:
-        params['anioMax'] = anioMax
-
-    return url, params
-
-def armar_url_agregar(url):
-    """Construye la URL y parámetros para agregar un libro"""
-    print("\nAclaración: los campos no requeridos se pueden dejar en blanco\n")
-    titulo = input("Ingrese el título (*requerido) >")
-    autor = input("Ingrese el autor (*requerido) >")
-    idioma = input("Ingrese el idioma (*requerido) >")
-    paginas = input("Ingrese el número de páginas (*requerido) >")
-    pais = input("Ingrese el país (*requerido) >")
-    anio = input("Ingrese el año (*requerido) >")
-    imagen = input("Ingrese el link de la imagen >")
-    link = input("Ingrese el link del libro >")
-
-    url = f"{url}{titulo}"
+        filtros['pais'] = pais
     
+    # Campos numéricos
+    anio_min = obtener_entero("Año mínimo: ", obligatorio=False, minimo=-5000)
+    if anio_min is not None:
+        filtros['anioMin'] = anio_min
+    
+    anio_max = obtener_entero("Año máximo: ", obligatorio=False, minimo=-5000)
+    if anio_max is not None:
+        filtros['anioMax'] = anio_max
+    
+    return filtros
+
+def obtener_datos_libro(tipo: str = "nuevo") -> tuple:
+    """
+    Solicita datos de un libro al usuario
+    
+    Args:
+        tipo: "nuevo" para agregar, "actualizar" para modificar
+    
+    Returns:
+        tuple: (titulo, params) o (titulo_original, titulo_nuevo, params)
+    """
+    print("\n" + "-"*40)
+    print(f"INGRESE LOS DATOS DEL LIBRO ({tipo.upper()})")
+    print("(*) Campos obligatorios")
+    print("-"*40)
+    
+    # Título (manejo especial para actualización)
+    if tipo == "actualizar":
+        titulo_original = input("Título del libro a actualizar (*) > ").strip()
+        if not titulo_original:
+            print("❌ Error: El título original es obligatorio")
+            return None, None, None
+        
+        titulo_nuevo = input("Nuevo título (*) > ").strip()
+        if not titulo_nuevo:
+            print("❌ Error: El nuevo título es obligatorio")
+            return None, None, None
+    else:
+        titulo = input("Título (*) > ").strip()
+        if not titulo:
+            print("❌ Error: El título es obligatorio")
+            return None, None
+    
+    # Campos obligatorios de texto
+    autor = input("Autor (*) > ").strip()
+    if not autor:
+        print("❌ Error: El autor es obligatorio")
+        return (None, None) if tipo == "nuevo" else (None, None, None)
+    
+    idioma = input("Idioma (*) > ").strip()
+    if not idioma:
+        print("❌ Error: El idioma es obligatorio")
+        return (None, None) if tipo == "nuevo" else (None, None, None)
+    
+    pais = input("País (*) > ").strip()
+    if not pais:
+        print("❌ Error: El país es obligatorio")
+        return (None, None) if tipo == "nuevo" else (None, None, None)
+    
+    # Campos obligatorios numéricos
+    paginas = obtener_entero("Número de páginas (*) > ", obligatorio=True, minimo=1)
+    if paginas is None:
+        return (None, None) if tipo == "nuevo" else (None, None, None)
+    
+    anio = obtener_entero("Año (*) > ", obligatorio=True, minimo=-5000, maximo=2100)
+    if anio is None:
+        return (None, None) if tipo == "nuevo" else (None, None, None)
+    
+    # Campos opcionales
+    imagen = input("Link de imagen (opcional) > ").strip()
+    link = input("Link del libro (opcional) > ").strip()
+    
+    # Construir parámetros
     params = {
         'autor': autor,
         'idioma': idioma,
-        'paginas': paginas,
         'pais': pais,
+        'paginas': paginas,
         'anio': anio
     }
     
+    # Campos específicos por tipo
+    if tipo == "actualizar":
+        params['tituloAct'] = titulo_nuevo
+    
+    # Agregar campos opcionales si no están vacíos
     if imagen:
         params['imagen'] = imagen
     if link:
         params['link'] = link
-
-    return url, params
-
-def armar_url_actualizar(url):
-    """Construye la URL y parámetros para actualizar un libro"""
-    print("Aclaración: los campos no requeridos se pueden dejar en blanco")
-
-    titulo = input("Ingrese el título del libro a actualizar (*requerido) >")
-    tituloAct = input("Ingrese el nuevo título del libro (*requerido) >")
-    autor = input("Ingrese el autor (*requerido) >")
-    idioma = input("Ingrese el idioma (*requerido) >")
-    paginas = input("Ingrese el número de páginas (*requerido) >")
-    pais = input("Ingrese el país (*requerido) >")
-    anio = input("Ingrese el año (*requerido) >")
-    imagen = input("Ingrese el link de la imagen >")
-    link = input("Ingrese el link del libro >")
-
-    url = f"{url}{titulo}"
     
-    params = {
-        'tituloAct': tituloAct,
-        'autor': autor,
-        'idioma': idioma,
-        'paginas': paginas,
-        'pais': pais,
-        'anio': anio
-    }
-    
-    if imagen:
-        params['imagen'] = imagen
-    if link:
-        params['link'] = link
-
-    return url, params
+    # Retornar según el tipo
+    if tipo == "nuevo":
+        return titulo, params
+    else:
+        return titulo_original, titulo_nuevo, params
 
 def main():
     """Función principal del cliente"""
-    # Mensaje de bienvenida con manejo de errores
+    global USERNAME, PASSWORD
+    
+    print("\n" + "="*60)
+    print("CLIENTE API - BIBLIOTECA ONLINE")
+    print("="*60)
+    
+    # Verificar conexión con el servidor
     try:
-        response = requests.get(URL)
-        print(f"Status code: {response.status_code}")
+        print("\nConectando con el servidor...")
+        response = requests.get(URL, timeout=5)
         
-        response.raise_for_status()
-        bienvenida = response.json()
-        
-        print("\n--- Respuesta del servidor ---")
-        for key, value in bienvenida.items():
-            print(f"{key}: {value}")
-        print("----------------------------\n")
+        if response.status_code == 200:
+            bienvenida = response.json()
+            print("Conexión exitosa con el servidor")
+            print(f"   Servidor: {bienvenida.get('servidor', 'Desconocido')}")
+            print(f"   Libros disponibles: {bienvenida.get('cantidad_libros', 0)}")
+        else:
+            print(f"⚠️ Servidor respondió con código: {response.status_code}")
+            
     except requests.exceptions.ConnectionError:
-        print(f"Error: No se puede conectar con el servidor en {URL}")
-        print("Asegúrate de que el servidor esté ejecutándose")
+        print(f"❌ Error: No se puede conectar con el servidor en {URL}")
+        print("   Asegúrate de que el servidor esté ejecutándose")
+        return
+    except requests.exceptions.Timeout:
+        print("❌ Error: Tiempo de espera agotado al conectar con el servidor")
         return
     except Exception as e:
-        print(f"Error al conectar con el servidor: {e}")
+        print(f"❌ Error al conectar con el servidor: {e}")
         return
-
+    
+    # Bucle principal del menú
     opc = menu()
-
+    
     while opc != 6:
-        url = f"{URL}/libros/"
-
         try:
-            if opc == 1:  # Buscar libro
-                titulo = input("Ingrese el título del libro >")
-                url = f"{url}{titulo}"
-                rta = requests.get(url)
-                print()
+            if opc == 1:  # Buscar libro por título
+                print("\nBUSCAR LIBRO POR TÍTULO")
+                titulo = input("Ingrese el título del libro: ").strip()
                 
-                if rta.status_code == 200:
-                    libro = rta.json()
-                    mostrar_libro(libro)
+                if not titulo:
+                    print("❌ Error: Debe ingresar un título")
                 else:
-                    error = rta.json()
-                    print(f"Error: {error.get('detail', 'Error desconocido')}")
-
+                    response = requests.get(f"{URL}/libros/{titulo}")
+                    
+                    if response.status_code == 200:
+                        libro = response.json()
+                        print(f"\n✅ Libro encontrado:")
+                        mostrar_libro(libro)
+                    elif response.status_code == 404:
+                        print("❌ Libro no encontrado")
+                    else:
+                        error = response.json()
+                        print(f"❌ Error del servidor: {error.get('detail', 'Error desconocido')}")
+            
             elif opc == 2:  # Filtrar libros
-                url, params = armar_url_filtro(url)
-                rta = requests.get(url, params=params)
-                print()
+                print("\nFILTRAR LIBROS")
+                filtros = obtener_filtros()
                 
-                if rta.status_code == 200:
-                    libros = rta.json()
-                    mostrar_todos(libros)
+                if filtros:
+                    response = requests.get(f"{URL}/libros/", params=filtros)
                 else:
-                    error = rta.json()
-                    print(f"Error: {error.get('detail', 'Error desconocido')}")
-
-            elif opc == 3:  # Agregar libro (CON AUTENTICACIÓN)
-                url, params = armar_url_agregar(url)
+                    response = requests.get(f"{URL}/libros/")
+                
+                if response.status_code == 200:
+                    libros = response.json()
+                    if libros:
+                        print(f"\n✅ Se encontraron {len(libros)} libro(s):")
+                        mostrar_todos(libros)
+                    else:
+                        print("❌ No se encontraron libros con esos filtros")
+                else:
+                    error = response.json()
+                    print(f"❌ Error: {error.get('detail', 'Error desconocido')}")
+            
+            elif opc == 3:  # Agregar libro (REQUIERE AUTENTICACIÓN)
+                print("\n AGREGAR NUEVO LIBRO")
+                
+                # Solicitar credenciales
+                if not USERNAME or not PASSWORD:
+                    USERNAME, PASSWORD = solicitar_credenciales()
+                
+                # Obtener datos del libro
+                resultado = obtener_datos_libro("nuevo")
+                if resultado[0] is None:  # Error en la entrada
+                    continue
+                
+                titulo, params = resultado
+                
+                # Enviar solicitud con autenticación
                 auth = HTTPBasicAuth(USERNAME, PASSWORD)
-                rta = requests.post(url, params=params, auth=auth)
-                print()
+                response = requests.post(
+                    f"{URL}/libros/{titulo}",
+                    params=params,
+                    auth=auth,
+                    timeout=10
+                )
                 
-                if rta.status_code == 200:
-                    msj = rta.json()
-                    print(f"✓ {msj['message']}")
+                if response.status_code == 200:
+                    resultado = response.json()
+                    print(f"\n✅ {resultado['message']}")
+                    if 'usuario_autenticado' in resultado:
+                        print(f"   Usuario: {resultado['usuario_autenticado']}")
+                elif response.status_code == 401:
+                    print("❌ Error de autenticación: Credenciales incorrectas")
+                    USERNAME = PASSWORD = None  # Resetear credenciales
                 else:
-                    error = rta.json()
-                    print(f"Error: {error.get('detail', 'Error desconocido')}")
-
+                    error = response.json()
+                    print(f"❌ Error: {error.get('detail', 'Error desconocido')}")
+            
             elif opc == 4:  # Actualizar libro
-                url, params = armar_url_actualizar(url)
-                rta = requests.put(url, params=params)
-                print()
-                
-                if rta.status_code == 200:
-                    msj = rta.json()
-                    print(f"✓ {msj['message']}")
-                else:
-                    error = rta.json()
-                    print(f"Error: {error.get('detail', 'Error desconocido')}")
+                print("\n ACTUALIZAR LIBRO")
 
-            elif opc == 5:  # Eliminar libro (CON AUTENTICACIÓN)
-                titulo = input("Ingrese el título del libro a eliminar >")
-                url = f"{url}{titulo}"
+                # Solicitar credenciales si no están guardadas
+                if not USERNAME or not PASSWORD:
+                    USERNAME, PASSWORD = solicitar_credenciales()
+                
+                # Obtener datos del libro
+                resultado = obtener_datos_libro("actualizar")
+                if resultado[0] is None:  # Error en la entrada
+                    continue
+                
+                titulo_original, titulo_nuevo, params = resultado
+                
+                # Enviar solicitud (sin autenticación para PUT según el proyecto)
+                response = requests.put(
+                    f"{URL}/libros/{titulo_original}",
+                    params=params,
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    resultado = response.json()
+                    print(f"\n✅ {resultado['message']}")
+                else:
+                    error = response.json()
+                    print(f"❌ Error: {error.get('detail', 'Error desconocido')}")
+            
+            elif opc == 5:  # Eliminar libro (REQUIERE AUTENTICACIÓN)
+                print("\n ELIMINAR LIBRO")
+                
+                # Solicitar título
+                titulo = input("Ingrese el título del libro a eliminar: ").strip()
+                if not titulo:
+                    print("❌ Error: Debe ingresar un título")
+                    continue
+                
+                # Solicitar credenciales si no están guardadas
+                if not USERNAME or not PASSWORD:
+                    USERNAME, PASSWORD = solicitar_credenciales()
+                
+                # Confirmar eliminación
+                confirmar = input(f"¿Está seguro de eliminar '{titulo}'? (s/n): ").strip().lower()
+                if confirmar != 's':
+                    print("❌ Eliminación cancelada")
+                    continue
+                
+                # Enviar solicitud con autenticación
                 auth = HTTPBasicAuth(USERNAME, PASSWORD)
-                rta = requests.delete(url, auth=auth)
-                print()
+                response = requests.delete(
+                    f"{URL}/libros/{titulo}",
+                    auth=auth,
+                    timeout=10
+                )
                 
-                if rta.status_code == 200:
-                    msj = rta.json()
-                    print(f"✓ {msj['message']}")
+                if response.status_code == 200:
+                    resultado = response.json()
+                    print(f"\n✅ {resultado['message']}")
+                    if 'usuario_autenticado' in resultado:
+                        print(f"   Usuario: {resultado['usuario_autenticado']}")
+                elif response.status_code == 401:
+                    print("❌ Error de autenticación: Credenciales incorrectas")
+                    USERNAME = PASSWORD = None  # Resetear credenciales
                 else:
-                    error = rta.json()
-                    print(f"Error: {error.get('detail', 'Error desconocido')}")
-
+                    error = response.json()
+                    print(f"❌ Error: {error.get('detail', 'Error desconocido')}")
+            
+            else:
+                print("❌ Opción no válida")
+        
         except requests.exceptions.RequestException as e:
-            print(f"Error en la solicitud: {e}")
+            print(f"❌ Error en la solicitud HTTP: {e}")
+        except ValueError as e:
+            print(f"❌ Error de validación: {e}")
         except Exception as e:
-            print(f"Error: {e}")
-
-        print()
+            print(f"❌ Error inesperado: {e}")
+        
+        # Volver al menú
         opc = menu()
-
-    print("\n¡Hasta luego!")
+    
+    print("\n" + "="*50)
+    print("¡Gracias por usar la Biblioteca Online!")
+    print("Hasta pronto")
+    print("="*50)
 
 if __name__ == "__main__":
     main()

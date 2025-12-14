@@ -24,27 +24,44 @@ def guardar_libros(libros):
         json.dump(libros, file, indent=2, ensure_ascii=False)
 
 def indice_libro(libros, titulo):
-    """Obtiene el índice de un libro por título"""
+    """Obtiene el índice de un libro por título (case-insensitive)"""
+    titulo_lower = titulo.lower().strip()
     for i, libro in enumerate(libros):
-        if libro["title"] == titulo:
+        if libro["title"].lower() == titulo_lower:
             return i
     return -1
 
 def filtrar_libros(libros, autor=None, idioma=None, pais=None, anioMin=None, anioMax=None):
-    """Filtra libros según criterios"""
-    anioMin = int(anioMin) if anioMin else -9999
-    anioMax = int(anioMax) if anioMax else 9999
+    """Filtra libros según criterios (case-insensitive con búsqueda parcial)"""
+    # Convertir límites de año
+    anioMin = int(anioMin) if anioMin is not None else -9999
+    anioMax = int(anioMax) if anioMax is not None else 9999
+    
+    # Normalizar filtros de texto
+    filtro_autor = autor.lower().strip() if autor else None
+    filtro_idioma = idioma.lower().strip() if idioma else None
+    filtro_pais = pais.lower().strip() if pais else None
     
     filtro = libros
     
-    if autor:
-        filtro = [libro for libro in filtro if libro["author"] == autor]
-    if idioma:
-        filtro = [libro for libro in filtro if libro["language"] == idioma]
-    if pais:
-        filtro = [libro for libro in filtro if libro["country"] == pais]
+    # Filtrar por autor (case-insensitive, búsqueda parcial)
+    if filtro_autor:
+        filtro = [libro for libro in filtro 
+                 if filtro_autor in libro.get("author", "").lower().strip()]
     
-    filtro = [libro for libro in filtro if anioMin <= libro["year"] <= anioMax]
+    # Filtrar por idioma (case-insensitive, búsqueda parcial)
+    if filtro_idioma:
+        filtro = [libro for libro in filtro 
+                 if filtro_idioma in libro.get("language", "").lower().strip()]
+    
+    # Filtrar por país (case-insensitive, búsqueda parcial)
+    if filtro_pais:
+        filtro = [libro for libro in filtro 
+                 if filtro_pais in libro.get("country", "").lower().strip()]
+    
+    # Filtrar por rango de años
+    filtro = [libro for libro in filtro 
+             if anioMin <= libro.get("year", 0) <= anioMax]
     
     return filtro
 
@@ -84,10 +101,27 @@ def get_filtrar_libros(
 def get_libro(titulo: str) -> dict:
     """Obtiene un libro específico"""
     libros = cargar_libros()
-    indice = indice_libro(libros, titulo)
     
-    if indice != -1:
-        return libros[indice]
+    # Normalizar búsqueda: quitar espacios y convertir a minúsculas
+    titulo_normalizado = titulo.strip().lower()
+    
+    # Buscar coincidencia exacta (case-insensitive)
+    for libro in libros:
+        if libro["title"].strip().lower() == titulo_normalizado:
+            return libro
+    
+    # Si no encuentra exacto, buscar parcial
+    libros_coincidentes = []
+    for libro in libros:
+        if titulo_normalizado in libro["title"].strip().lower():
+            libros_coincidentes.append(libro)
+    
+    if len(libros_coincidentes) == 1:
+        return libros_coincidentes[0]
+    elif len(libros_coincidentes) > 1:
+        # Si hay múltiples coincidencias, devolver el primero
+        print(f"⚠️  Múltiples coincidencias para '{titulo}'. Mostrando la primera.")
+        return libros_coincidentes[0]
     else:
         raise HTTPException(status_code=404, detail="Libro no encontrado")
 

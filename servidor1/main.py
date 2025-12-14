@@ -1,6 +1,5 @@
 """
 SERVIDOR 1 - Gateway/Proxy
-Versión con rate limiting manual (sin slowapi)
 """
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -20,13 +19,13 @@ security = HTTPBasic()
 USERNAME = "admin"
 PASSWORD = "redes2025"
 
-# Rate limiting manual - simple pero efectivo
+# Rate limiting manual
 request_counts = defaultdict(list)
 RATE_LIMIT = 2  # requests
-RATE_WINDOW = 5  # segundo
+RATE_WINDOW = 15  # segundos
 
 def check_rate_limit(client_ip: str):
-    """Verifica si el cliente ha excedido el límite de requests"""
+    """Verifica si el cliente ha excedido el límite de requests en la ventana de tiempo"""
     now = time.time()
     
     # Limpiar requests antiguos (fuera de la ventana de tiempo)
@@ -35,14 +34,16 @@ def check_rate_limit(client_ip: str):
         if now - timestamp < RATE_WINDOW
     ]
     
-    # Verificar si excede el límite
+    # Verificar si excede el límite ANTES de agregar el nuevo request
     if len(request_counts[client_ip]) >= RATE_LIMIT:
+        oldest_request = min(request_counts[client_ip])
+        wait_time = RATE_WINDOW - (now - oldest_request)
         raise HTTPException(
             status_code=429,
-            detail=f"Rate limit exceeded: {RATE_LIMIT} per {RATE_WINDOW} second"
+            detail=f"Rate limit exceeded: {RATE_LIMIT} requests per {RATE_WINDOW} seconds. Try again in {wait_time:.1f}s"
         )
     
-    # Registrar este request
+    # Registrar este request DESPUÉS de verificar
     request_counts[client_ip].append(now)
 
 def verificar_credenciales(credentials: HTTPBasicCredentials = Depends(security)):
