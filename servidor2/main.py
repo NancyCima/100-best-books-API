@@ -137,17 +137,7 @@ def agregar_libro(
     link: str = None
 ):
     """Agrega un nuevo libro"""
-    # Validar campos requeridos
-    if not all([titulo, autor, idioma, pais]):
-        raise HTTPException(status_code=400, detail="Faltan campos obligatorios")
-    
-    # Validar tipos de datos
-    try:
-        paginas = int(paginas)
-        anio = int(anio)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Páginas y año deben ser números")
-    
+
     libros = cargar_libros()
     
     nuevo_libro = {
