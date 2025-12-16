@@ -22,6 +22,12 @@ Sistema de biblioteca online con arquitectura de tres capas:
 
 ### 🚀 Inicio Rápido
 
+#### 0. Crear entornos virtuales
+```bash
+python -m venv .venv     
+.\.venv\Scripts\activate 
+```
+
 #### 1. Servidor 2 (Datos)
 ```bash
 cd servidor2
@@ -52,7 +58,7 @@ python main.py
 - Contraseña: `redes2025`
 
 **Rate Limiting**:
-- 2 requests cada 5 segundos
+- 2 requests cada 15 segundos
 
 ---
 
