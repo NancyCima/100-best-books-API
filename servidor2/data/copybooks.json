@@ -1020,16 +1020,6 @@
     "year": 1987
   },
   {
-    "author": "Test",
-    "country": "ar",
-    "imageLink": null,
-    "language": "es",
-    "link": null,
-    "pages": 100,
-    "title": "TestAuth",
-    "year": 2025
-  },
-  {
     "author": "Kentaro Miura",
     "country": "Japan",
     "imageLink": null,
@@ -1038,5 +1028,15 @@
     "pages": 376,
     "title": "Berserk 3",
     "year": 1997
+  },
+  {
+    "author": "Alfredo Velazquez",
+    "country": "Argentina",
+    "imageLink": null,
+    "language": "Español",
+    "link": null,
+    "pages": 55,
+    "title": "SQL Queries",
+    "year": 2025
   }
 ]

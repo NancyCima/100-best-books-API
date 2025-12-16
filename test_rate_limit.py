@@ -57,7 +57,7 @@ def test_rate_limit_rapido(url="http://localhost:8000/"):
                 'error': str(e)
             })
     
-    print(" Lanzando 5 requests casi simultáneos...\n")
+    print(" Lanzando 15 requests casi simultáneos...\n")
     start_time = time.time()
     
     for i in range(1, 6):
@@ -125,9 +125,9 @@ def test_rate_limit_secuencial(url="http://localhost:8000/"):
 
 def test_rate_limit_reset(url="http://localhost:8000/"):
     """
-    Verifica que el rate limit se resetee después de 5 segundos
+    Verifica que el rate limit se resetee después de 15 segundos
     """
-    print("\n\nTEST 3: Verificar reset después de 5 segundos")
+    print("\n\nTEST 3: Verificar reset después de 15 segundos")
     print("="*60)
     
     print("Fase 1: Hacer 3 requests rápidos")
@@ -146,8 +146,8 @@ def test_rate_limit_reset(url="http://localhost:8000/"):
     else:
         print("\n⚠️  Ningún request fue bloqueado en la fase 1")
     
-    print("\nEsperando 6 segundos para reset...")
-    time.sleep(6)
+    print("\nEsperando 16 segundos para reset...")
+    time.sleep(16)
     
     print("\nFase 2: Hacer 2 requests después del reset")
     success_after_reset = 0
